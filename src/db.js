@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const uri = process.env.MONGODB_URI;
-const dbName = process.env.DB_NAME || 'lefebvre';
+const dbName = process.env.DB_NAME || 'projet';
 
 if (!uri) {
   throw new Error('MONGODB_URI manquant. Définissez-le dans .env');

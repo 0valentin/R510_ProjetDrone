@@ -7,7 +7,7 @@ Affiche le résultat de `lefebvre.droneFpv.find()` dans un tableau dynamique.
 
 ```bash
 npm install
-cp .env.example .env   # renseignez MONGODB_URI et DB_NAME=lefebvre
+cp .env.example .env   # renseignez MONGODB_URI et DB_NAME=projet
 npm run dev            # ou npm start
 # puis ouvrez http://localhost:3000
 ```
@@ -17,3 +17,9 @@ npm run dev            # ou npm start
 - `/` : page HTML statique qui construit le tableau en JS via `fetch`.
 
 - `/api/droneFpv` : renvoie tous les documents (limités à 500) depuis `lefebvre.droneFpv`.
+
+
+## Nouvelle page: Constructeur
+
+- Page: `/constructeur` (HTML/JS/CSS dédiés)
+- API: `/api/constructeurs?q=<texte>&minCount=<n>`

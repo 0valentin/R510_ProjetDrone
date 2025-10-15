@@ -1,7 +1,7 @@
 {
-  "name": "lefebvre-dronefpv-js",
+  "name": "projet-dronefpv-js",
   "version": "1.0.0",
-  "description": "Express + MongoDB avec frontend HTML/JS (sans EJS). Affiche lefebvre.droneFpv dans un tableau.",
+  "description": "Express + MongoDB (DB=projet) avec frontend HTML/JS (sans EJS). Affiche projet.droneFpv dans un tableau.",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",

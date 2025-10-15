@@ -11,24 +11,38 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares
+// ---- Helper de log par handler ----
+function logCall(fnName, req) {
+  console.log(`▶ ${fnName}: ${req.method} ${req.originalUrl}`);
+}
+
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Healthcheck
-app.get('/health', (req, res) => res.json({ ok: true }));
+// ---------------- Pages ----------------
+function healthHandler(req, res) {
+  logCall('healthHandler', req);
+  res.json({ ok: true });
+}
+app.get('/health', healthHandler);
 
-// Pages
-app.get('/', (_req, res) => {
+function homePageHandler(_req, res) {
+  // pas de req ici, on log quand même la route via un faux objet
+  console.log('▶ homePageHandler: GET /');
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-app.get('/constructeur', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'constructeur.html'));
-});
+}
+app.get('/', homePageHandler);
 
-// API debug simple
-app.get('/api/droneFpv', async (req, res, next) => {
+function constructeurPageHandler(_req, res) {
+  console.log('▶ constructeurPageHandler: GET /constructeur');
+  res.sendFile(path.join(__dirname, '..', 'public', 'constructeur.html'));
+}
+app.get('/constructeur', constructeurPageHandler);
+
+// ------------- Debug simple -------------
+async function droneFpvHandler(req, res, next) {
+  logCall('droneFpvHandler', req);
   try {
     await connect();
     const col = getCollection('droneFpv');
@@ -36,29 +50,39 @@ app.get('/api/droneFpv', async (req, res, next) => {
     const docs = await col.find({}).limit(limit).toArray();
     res.json(docs);
   } catch (err) { next(err); }
-});
+}
+app.get('/api/droneFpv', droneFpvHandler);
 
-// Catégories
-app.get('/api/categories', async (req, res, next) => {
+// --------- DISTINCT des catégories ---------
+async function categoriesHandler(req, res, next) {
+  logCall('categoriesHandler', req);
   try {
     await connect();
     const col = getCollection('droneFpv');
     const categories = await col.distinct('category');
     res.json(categories || []);
   } catch (err) { next(err); }
-});
+}
+app.get('/api/categories', categoriesHandler);
 
-// Distinct multiples
-// GET /api/distinct?category=batteries&fields=brand,price.currency,specs.connector
-app.get('/api/distinct', async (req, res, next) => {
+// --------- DISTINCT multi-champs ---------
+async function distinctHandler(req, res, next) {
+  logCall('distinctHandler', req);
   try {
     const category = String(req.query.category || '').trim();
-    const fields = String(req.query.fields || '').split(',').map(s => s.trim()).filter(Boolean);
+    const fields = String(req.query.fields || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
     if (!category || !fields.length) {
       return res.status(400).json({ error: 'Paramètres "category" et "fields" requis' });
     }
-    const isSafeKey = (k) => /^[a-zA-Z0-9_.-]+$/.test(k);
-    for (const f of fields) if (!isSafeKey(f)) return res.status(400).json({ error: `Champ invalide: ${f}` });
+
+    const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
+    for (const f of fields) {
+      if (!SAFE_KEY_RE.test(f)) {
+        return res.status(400).json({ error: `Champ invalide: ${f}` });
+      }
+    }
 
     await connect();
     const col = getCollection('droneFpv');
@@ -68,18 +92,21 @@ app.get('/api/distinct', async (req, res, next) => {
     }
     res.json(out);
   } catch (err) { next(err); }
-});
+}
+app.get('/api/distinct', distinctHandler);
 
-// Range min/max numérique
-// GET /api/range?category=batteries&field=price.eur
-app.get('/api/range', async (req, res, next) => {
+// --------- RANGE min/max ---------
+async function rangeHandler(req, res, next) {
+  logCall('rangeHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     const field = String(req.query.field || '').trim();
-    const isSafeKey = (k) => /^[a-zA-Z0-9_.-]+$/.test(k);
-    if (!category || !field || !isSafeKey(field)) {
+    const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
+
+    if (!category || !field || !SAFE_KEY_RE.test(field)) {
       return res.status(400).json({ error: 'Paramètres "category" et "field" requis' });
     }
+
     await connect();
     const col = getCollection('droneFpv');
 
@@ -91,13 +118,16 @@ app.get('/api/range', async (req, res, next) => {
     const [result] = await col.aggregate(pipeline).toArray();
     res.json(result || { min: null, max: null });
   } catch (err) { next(err); }
-});
+}
+app.get('/api/range', rangeHandler);
 
-// Clés disponibles dans specs
-app.get('/api/spec-keys', async (req, res, next) => {
+// --------- Keys dans specs ---------
+async function specKeysHandler(req, res, next) {
+  logCall('specKeysHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" requis' });
+
     await connect();
     const col = getCollection('droneFpv');
 
@@ -112,13 +142,16 @@ app.get('/api/spec-keys', async (req, res, next) => {
     const rows = await col.aggregate(pipeline).toArray();
     res.json(rows.map(r => r.key));
   } catch (err) { next(err); }
-});
+}
+app.get('/api/spec-keys', specKeysHandler);
 
-// Clés disponibles dans compat
-app.get('/api/compat-keys', async (req, res, next) => {
+// --------- Keys dans compat ---------
+async function compatKeysHandler(req, res, next) {
+  logCall('compatKeysHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" requis' });
+
     await connect();
     const col = getCollection('droneFpv');
 
@@ -133,11 +166,12 @@ app.get('/api/compat-keys', async (req, res, next) => {
     const rows = await col.aggregate(pipeline).toArray();
     res.json(rows.map(r => r.key));
   } catch (err) { next(err); }
-});
+}
+app.get('/api/compat-keys', compatKeysHandler);
 
-// ✅ NOUVEAU : Clés “générales” (tous les champs scalaires au niveau racine)
-// GET /api/field-keys?category=frames
-app.get('/api/field-keys', async (req, res, next) => {
+// --------- Keys "générales" ---------
+async function fieldKeysHandler(req, res, next) {
+  logCall('fieldKeysHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" requis' });
@@ -161,7 +195,7 @@ app.get('/api/field-keys', async (req, res, next) => {
 
     for (const r of rows) {
       const k = r.key;
-      if (['_id','category','specs','compat','price'].includes(k)) continue; // déjà gérés ailleurs
+      if (['_id','category','specs','compat','price'].includes(k)) continue;
       const tset = new Set(r.types || []);
       const hasNum = [...tset].some(t => NUMERIC_TYPES.has(t));
       const hasStringOrBool = tset.has('string') || tset.has('bool') || tset.has('boolean');
@@ -169,8 +203,6 @@ app.get('/api/field-keys', async (req, res, next) => {
       else if (hasStringOrBool) scalar.push(k);
     }
 
-    // On ajoute les champs de price à la main pour “tous les champs”
-    // si tu veux les intégrer au select général.
     const hasPrice = rows.some(r => r.key === 'price');
     if (hasPrice) {
       numeric.push('price.eur');
@@ -182,10 +214,12 @@ app.get('/api/field-keys', async (req, res, next) => {
       numeric: [...new Set(numeric)].sort()
     });
   } catch (err) { next(err); }
-});
+}
+app.get('/api/field-keys', fieldKeysHandler);
 
-// Pièces avec FILTRES côté serveur (résultat direct)
-app.get('/api/parts', async (req, res, next) => {
+// --------- Parts (filtre JSON) ---------
+async function partsHandler(req, res, next) {
+  logCall('partsHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" manquant' });
@@ -200,9 +234,9 @@ app.get('/api/parts', async (req, res, next) => {
       }
     }
 
-    const isSafeKey = (k) => /^[a-zA-Z0-9_.-]+$/.test(k);
+    const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
     for (const k of Object.keys(extraFilter)) {
-      if (!isSafeKey(k) && !k.startsWith('$')) {
+      if (!SAFE_KEY_RE.test(k) && !k.startsWith('$')) {
         return res.status(400).json({ error: `Clé de filtre non autorisée: ${k}` });
       }
     }
@@ -214,13 +248,30 @@ app.get('/api/parts', async (req, res, next) => {
     const docs = await col.find(query).limit(limit).toArray();
     res.json(docs);
   } catch (err) { next(err); }
-});
+}
+app.get('/api/parts', partsHandler);
 
-// Gestion des erreurs
-app.use((err, req, res, _next) => {
-  console.error(err);
+
+
+app.put('/api/droneFpvAdd', addDrone);
+
+// --------- DISTINCT des catégories ---------
+async function addDrone(req, res, next) {
+  logCall('addDrone', req);
+  try {
+    await connect();
+    const col = getCollection('droneFpv');
+    const categories = await col.distinct('category');
+    res.json(categories || []);
+  } catch (err) { next(err); }
+}
+
+// ------------- Erreurs -------------
+function errorHandler(err, req, res, _next) {
+  console.error('✖ errorHandler:', err);
   res.status(500).json({ error: 'Erreur serveur', details: err.message });
-});
+}
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`➡️  Serveur démarré sur http://localhost:${PORT}`);

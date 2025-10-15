@@ -20,8 +20,36 @@
     <!-- RÉCAP EN HAUT -->
     <section id="resultConfig">
       <h3>Récapitulatif</h3>
+
+      <!-- Meta setup -->
+      <div class="form-config" style="margin-bottom:12px;">
+        <label>
+          Nom du setup :
+          <input id="setupName" type="text" placeholder="Ex. Freestyle 5 pouces" />
+        </label>
+        <label>
+          Créateur :
+          <input id="creatorName" type="text" placeholder="Ton nom / pseudo" />
+        </label>
+        <label>
+          Type :
+          <select id="setupType">
+            <option value="all_in">All in</option>
+            <option value="drone">Drone</option>
+            <option value="radio_drone_batterie">Radio + Drone + Batterie</option>
+            <option value="drone_batterie">Drone + Batterie</option>
+          </select>
+        </label>
+        <div style="display:grid;gap:8px;align-content:center;">
+          <div>Total : <strong><span id="totalPrice">0.00 €</span></strong></div>
+        </div>
+      </div>
+
       <ul id="buildList"></ul>
-      <button id="btnValider" type="button">Valider le drone</button>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+        <button id="btnValider" type="button">Valider le drone</button>
+      </div>
     </section>
 
     <h2>Choisir les pièces</h2>
@@ -51,7 +79,7 @@
     </section>
   </main>
 
-  <!-- MODAL FILTRES : Specs, Compat + Champs généraux -->
+  <!-- MODAL FILTRES : Specs / Compat / Champs généraux -->
   <div id="filtersModal" class="modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="filtersTitle">
       <header class="modal-header">
@@ -61,46 +89,14 @@
 
       <div class="modal-body">
         <div class="filter-grid">
-          <!-- Brand -->
-          <div>
-            <div class="label-legend">Brand</div>
-            <div id="brandBox" class="check-grid"></div>
-          </div>
-
-          <!-- Price -->
-          <div>
-            <div class="label-legend">Prix</div>
-            <label>Devise
-              <select id="priceCurrency"><option value="">(toutes)</option></select>
-            </label>
-            <div class="range-row">
-              <label>Min € <input id="priceMin" type="number" step="0.01" /></label>
-              <label>Max € <input id="priceMax" type="number" step="0.01" /></label>
-            </div>
-          </div>
-
-          <!-- Warranty -->
-          <div>
-            <div class="label-legend">Garantie (mois)</div>
-            <div class="range-row">
-              <label>Min <input id="warrantyMin" type="number" step="1" /></label>
-              <label>Max <input id="warrantyMax" type="number" step="1" /></label>
-            </div>
-          </div>
-
-          <!-- SPECS : plusieurs clés/valeurs -->
           <div>
             <div class="label-legend">Specs</div>
             <div id="specsBox" class="stack"></div>
           </div>
-
-          <!-- COMPAT : plusieurs clés/valeurs -->
           <div>
             <div class="label-legend">Compat</div>
             <div id="compatBox" class="stack"></div>
           </div>
-
-          <!-- ✅ CHAMPS GÉNÉRAUX : tous les autres champs de la catégorie -->
           <div>
             <div class="label-legend">Champs généraux</div>
             <div class="range-row">
@@ -109,7 +105,7 @@
               </label>
               <button id="addGeneralField" type="button">Ajouter</button>
             </div>
-            <div id="generalBox" class="stack"><!-- sections de filtres ajoutées dynamiquement --></div>
+            <div id="generalBox" class="stack"></div>
           </div>
         </div>
       </div>
@@ -117,6 +113,22 @@
       <footer class="modal-actions">
         <button id="applyFilters" class="btn-primary" type="button">Appliquer</button>
         <button id="resetFilters" type="button">Réinitialiser</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL JSON SORTIE -->
+  <div id="jsonModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="jsonTitle">
+      <header class="modal-header">
+        <h3 id="jsonTitle">JSON de la configuration</h3>
+        <button class="modal-close" id="closeJson" aria-label="Fermer">✕</button>
+      </header>
+      <div class="modal-body">
+        <pre id="jsonOutput" style="max-height:50vh;overflow:auto;"></pre>
+      </div>
+      <footer class="modal-actions">
+        <button id="downloadJson" type="button">Télécharger JSON</button>
       </footer>
     </div>
   </div>

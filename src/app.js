@@ -41,16 +41,43 @@ app.get('/api/pieces', async (req, res, next) => {
     await connect();
     const col = getCollection('droneFpv');
 
-    // ✅ Sécurisation et bornes raisonnables
-    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    // Pagination
+    const page  = Math.max(parseInt(req.query.page  || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '24', 10), 1), 200);
-    const skip = (page - 1) * limit;
+    const skip  = (page - 1) * limit;
 
-    // ✅ Filtres dynamiques
+    // --- Builder générique de filtres (pas de vérif côté back) ---
     const filter = {};
-    if (req.query.category) filter.category = req.query.category;
-    if (req.query.name) filter.name = { $regex: req.query.name, $options: 'i' }; // insensible à la casse
+    for (const [key, raw] of Object.entries(req.query)) {
+      if (key === 'page' || key === 'limit') continue; // ignore la pagination
 
+      // valeur brute -> string
+      const val = String(raw).trim();
+      if (val === '') continue;
+
+      // name => regex (contient, insensible à la casse)
+      if (key.toLowerCase() === 'name') {
+        filter[key] = { $regex: val, $options: 'i' };
+        continue;
+      }
+
+      // listes "a,b,c" => $in
+      if (val.includes(',')) {
+        const arr = val.split(',').map(s => s.trim()).filter(Boolean);
+        if (arr.length) filter[key] = { $in: arr };
+        continue;
+      }
+
+      // booléens "true/false"
+      if (/^(true|false)$/i.test(val)) {
+        filter[key] = val.toLowerCase() === 'true';
+        continue;
+      }
+
+      // par défaut: égalité simple
+      filter[key] = val;
+    }
+    
     // ✅ Récupération page courante
     const items = await col
       .find(filter)

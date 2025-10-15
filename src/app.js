@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // API : retourne tous les documents depuis lefebvre.droneFpv
+// API : agrégat des constructeurs (brand)
 app.get('/api/droneFpv', async (req, res, next) => {
   try {
     await connect();
@@ -33,6 +34,10 @@ app.get('/api/droneFpv', async (req, res, next) => {
 });
 
 // Fallback: sert l'index.html pour la racine
+app.get('/constructeur', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'constructeur.html'));
+});
+
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });

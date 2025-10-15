@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Constructeurs — projet.droneFpv</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/constructeur.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Constructeurs</h1>
+      <nav class="nav">
+        <a href="/" class="btn-link">Accueil</a>
+      </nav>
+    </header>
+
+    <section class="controls">
+      <input id="search" type="search" placeholder="Rechercher un constructeur…" />
+      <input id="minCount" type="number" min="0" step="1" placeholder="Min. drones" />
+      <button id="apply" type="button">Appliquer</button>
+    </section>
+
+    <div id="status" class="status">Chargement…</div>
+
+    <div class="cards" id="cards"></div>
+  </main>
+
+  <script src="/constructeur.js"></script>
+</body>
+</html>

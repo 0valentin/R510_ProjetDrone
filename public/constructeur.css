@@ -1,0 +1,10 @@
+/* public/constructeur.css */
+.nav { display: flex; gap: 8px; }
+.btn-link { background: #26324a; color: #e7ecf3; border: 1px solid #334362; padding: 8px 12px; border-radius: 8px; text-decoration: none; }
+.btn-link:hover { filter: brightness(1.1); }
+.controls { display: flex; gap: 8px; margin-bottom: 16px; }
+.controls input { background: #0f1724; color: #e7ecf3; border: 1px solid #182235; padding: 8px 10px; border-radius: 8px; }
+.controls button { background: #26324a; color: #e7ecf3; border: 1px solid #334362; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.card { background: #0f1724; border: 1px solid #182235; border-radius: 12px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.card h3 { margin: 0 0 6px; font-size: 1.1rem; }

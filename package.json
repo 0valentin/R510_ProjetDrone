@@ -1,0 +1,20 @@
+{
+  "name": "lefebvre-dronefpv-js",
+  "version": "1.0.0",
+  "description": "Express + MongoDB avec frontend HTML/JS (sans EJS). Affiche lefebvre.droneFpv dans un tableau.",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "mongodb": "^6.9.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

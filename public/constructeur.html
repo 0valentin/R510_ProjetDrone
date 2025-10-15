@@ -3,29 +3,127 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Constructeurs — projet.droneFpv</title>
+  <title>DroneBuilder – Configurateur</title>
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/constructeur.css" />
 </head>
 <body>
-  <main class="container">
-    <header class="header">
-      <h1>Constructeurs</h1>
-      <nav class="nav">
-        <a href="/" class="btn-link">Accueil</a>
-      </nav>
-    </header>
+  <header class="header">
+    <h1>🚁 DroneBuilder</h1>
+    <nav class="nav">
+      <a href="/" class="btn-link">Accueil</a>
+      <a href="/constructeur" class="btn-link">Créer un drone</a>
+    </nav>
+  </header>
 
-    <section class="controls">
-      <input id="search" type="search" placeholder="Rechercher un constructeur…" />
-      <input id="minCount" type="number" min="0" step="1" placeholder="Min. drones" />
-      <button id="apply" type="button">Appliquer</button>
+  <main class="configurateur container">
+    <!-- RÉCAP EN HAUT -->
+    <section id="resultConfig">
+      <h3>Récapitulatif</h3>
+      <ul id="buildList"></ul>
+      <button id="btnValider" type="button">Valider le drone</button>
     </section>
 
-    <div id="status" class="status">Chargement…</div>
+    <h2>Choisir les pièces</h2>
 
-    <div class="cards" id="cards"></div>
+    <!-- Contrôles -->
+    <section class="controls" style="display:flex;gap:10px;flex-wrap:wrap;">
+      <label>
+        Catégorie :
+        <select id="selectCategory">
+          <option value="">-- Choisir une catégorie --</option>
+        </select>
+      </label>
+
+      <button id="openFilters" type="button">Filtres</button>
+
+      <button id="clearCategory" type="button" title="Ne rien sélectionner pour cette catégorie">
+        Vider la sélection de cette catégorie
+      </button>
+    </section>
+
+    <!-- Tableau pièces -->
+    <section class="table-wrapper" id="partsSection" style="display:none;">
+      <table id="partsTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </section>
   </main>
+
+  <!-- MODAL FILTRES : Specs, Compat + Champs généraux -->
+  <div id="filtersModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="filtersTitle">
+      <header class="modal-header">
+        <h3 id="filtersTitle">Filtres (exécutés côté serveur)</h3>
+        <button class="modal-close" id="closeFilters" aria-label="Fermer">✕</button>
+      </header>
+
+      <div class="modal-body">
+        <div class="filter-grid">
+          <!-- Brand -->
+          <div>
+            <div class="label-legend">Brand</div>
+            <div id="brandBox" class="check-grid"></div>
+          </div>
+
+          <!-- Price -->
+          <div>
+            <div class="label-legend">Prix</div>
+            <label>Devise
+              <select id="priceCurrency"><option value="">(toutes)</option></select>
+            </label>
+            <div class="range-row">
+              <label>Min € <input id="priceMin" type="number" step="0.01" /></label>
+              <label>Max € <input id="priceMax" type="number" step="0.01" /></label>
+            </div>
+          </div>
+
+          <!-- Warranty -->
+          <div>
+            <div class="label-legend">Garantie (mois)</div>
+            <div class="range-row">
+              <label>Min <input id="warrantyMin" type="number" step="1" /></label>
+              <label>Max <input id="warrantyMax" type="number" step="1" /></label>
+            </div>
+          </div>
+
+          <!-- SPECS : plusieurs clés/valeurs -->
+          <div>
+            <div class="label-legend">Specs</div>
+            <div id="specsBox" class="stack"></div>
+          </div>
+
+          <!-- COMPAT : plusieurs clés/valeurs -->
+          <div>
+            <div class="label-legend">Compat</div>
+            <div id="compatBox" class="stack"></div>
+          </div>
+
+          <!-- ✅ CHAMPS GÉNÉRAUX : tous les autres champs de la catégorie -->
+          <div>
+            <div class="label-legend">Champs généraux</div>
+            <div class="range-row">
+              <label>Ajouter un champ
+                <select id="generalFieldSelect"><option value="">(choisir)</option></select>
+              </label>
+              <button id="addGeneralField" type="button">Ajouter</button>
+            </div>
+            <div id="generalBox" class="stack"><!-- sections de filtres ajoutées dynamiquement --></div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="modal-actions">
+        <button id="applyFilters" class="btn-primary" type="button">Appliquer</button>
+        <button id="resetFilters" type="button">Réinitialiser</button>
+      </footer>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2025 DroneBuilder. Tous droits réservés.</p>
+  </footer>
 
   <script src="/constructeur.js"></script>
 </body>

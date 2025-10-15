@@ -72,3 +72,28 @@ function escapeHtml(str) {
 
 document.getElementById('refreshBtn')?.addEventListener('click', fetchData);
 window.addEventListener('DOMContentLoaded', fetchData);
+
+
+
+async function fetchPieces({ page = 1, limit = 24, attribut, value } = {}) {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  if (category) params.set('category', category);
+  if (name) params.set('name', name);
+  const res = await fetch(`/api/pieces?${params.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+window.fetchPiecesDemo = async function fetchPiecesDemo() {
+  try {
+    console.log('Fetch page 1, limit 6, category=moteur');
+    const r = await fetchPieces({ page: 1, limit: 6, category: 'moteur' });
+    console.log('Result', r);
+    // Optionally render in table
+    if (Array.isArray(r.items)) renderTable(r.items);
+  } catch (err) {
+    console.error('fetchPiecesDemo error', err);
+  }
+};

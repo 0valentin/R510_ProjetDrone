@@ -7,8 +7,7 @@ let pageActuelle = 1;
 const taillePage = 24;
 let filtresCourants = {};          // { category: 'moteur', brand: 'GEPRC', ... }
 let dernieresColonnesConnues = []; // colonnes détectées au dernier rendu
-const showable = [];
-const filtrable = [];
+const filtrable = ['category', 'brand', 'in_stock', 'tags', 'deprecated'];
 
 /*******************************
  * OUTIL : échapper le HTML
@@ -254,6 +253,7 @@ function genererSelectsFiltresDepuisColonnes(colonnes) {
 
   cont.innerHTML = '';
   colonnesFiltrables.forEach(cle => {
+    if (!filtrable.includes(cle)) return;              // 🚦 ignore les champs non autorisés  
     const labelLisible = cle;
     const selectId = `select-filtre-${cle}`;
 

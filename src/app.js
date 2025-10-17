@@ -28,7 +28,6 @@ function healthHandler(req, res) {
 app.get('/health', healthHandler);
 
 function homePageHandler(_req, res) {
-  // pas de req ici, on log quand même la route via un faux objet
   console.log('▶ homePageHandler: GET /');
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 }
@@ -251,20 +250,121 @@ async function partsHandler(req, res, next) {
 }
 app.get('/api/parts', partsHandler);
 
-
-
-app.put('/api/droneFpvAdd', addDrone);
-
-// --------- DISTINCT des catégories ---------
-async function addDrone(req, res, next) {
-  logCall('addDrone', req);
+// ====== Nouveau handler issu du conflit, renommé en *2* ======
+// Liste paginée générique (GET /api/parts2?page=&limit=&...filtres plats...)
+async function partsHandler2(req, res, next) {
+  logCall('partsHandler2', req);
   try {
     await connect();
     const col = getCollection('droneFpv');
-    const categories = await col.distinct('category');
-    res.json(categories || []);
+
+    // Pagination
+    const page  = Math.max(parseInt(req.query.page  || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '24', 10), 1), 200);
+    const skip  = (page - 1) * limit;
+
+    // Builder générique des filtres à partir de la query (clé=valeur)
+    const filter = {};
+    for (const [key, raw] of Object.entries(req.query)) {
+      if (key === 'page' || key === 'limit') continue;
+      const val = String(raw).trim();
+      if (val === '') continue;
+
+      if (key.toLowerCase() === 'name') {
+        filter[key] = { $regex: val, $options: 'i' };
+        continue;
+      }
+      if (val.includes(',')) {
+        const arr = val.split(',').map(s => s.trim()).filter(Boolean);
+        if (arr.length) filter[key] = { $in: arr };
+        continue;
+      }
+      if (/^(true|false)$/i.test(val)) {
+        filter[key] = val.toLowerCase() === 'true';
+        continue;
+      }
+      filter[key] = val;
+    }
+
+    const totalDocs = await col.countDocuments(filter);
+    const items = await col
+      .find(filter)
+      .sort({ view: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const totalPages = Math.max(1, Math.ceil(totalDocs / limit));
+    const hasPrevPage = page > 1;
+    const hasNextPage = page < totalPages;
+
+    res.json({ items, page, limit, totalDocs, totalPages, hasPrevPage, hasNextPage });
   } catch (err) { next(err); }
 }
+app.get('/api/parts2', partsHandler2);
+
+// IMPORTANT : parser JSON (pour les PUT/POST qui suivent)
+app.use(express.json({ limit: '2mb' }));
+
+// ---- Enregistrer / insérer via REQUÊTE MongoDB (upsert) ----
+app.put('/api/droneFpvAdd', async (req, res, next) => {
+  logCall('droneFpvAdd', req);
+  try {
+    await connect();
+    const col = getCollection('droneFpv');
+
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ error: 'Corps JSON requis' });
+    }
+
+    if (Array.isArray(payload)) {
+      if (!payload.length) return res.status(400).json({ error: 'Tableau vide' });
+
+      const ops = payload.map((doc) => {
+        const filter = doc._id
+          ? { _id: doc._id }
+          : { _id: `${doc.category || 'item'}_${Date.now()}_${Math.random().toString(36).slice(2)}` };
+        const toSet = { created_at: new Date(), ...doc };
+        return {
+          updateOne: {
+            filter,
+            update: { $set: toSet },
+            upsert: true,
+          }
+        };
+      });
+
+      const r = await col.bulkWrite(ops, { ordered: false });
+      return res.status(201).json({
+        ok: true,
+        matchedCount: r.matchedCount,
+        modifiedCount: r.modifiedCount,
+        upsertedCount: r.upsertedCount,
+        upsertedIds: r.upsertedIds,
+      });
+    }
+
+    const filter = payload._id
+      ? { _id: payload._id }
+      : { _id: `${payload.category || 'item'}_${Date.now()}_${Math.random().toString(36).slice(2)}` };
+
+    const update = { $set: { created_at: new Date(), ...payload } };
+    const result = await col.updateOne(filter, update, { upsert: true });
+
+    return res.status(201).json({
+      ok: true,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedId: result.upsertedId || (payload._id || filter._id),
+    });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'Doublon (_id déjà présent)', details: err.keyValue });
+    }
+    next(err);
+  }
+});
 
 // ------------- Erreurs -------------
 function errorHandler(err, req, res, _next) {

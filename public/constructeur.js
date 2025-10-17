@@ -24,6 +24,27 @@ const cache = Object.create(null);
 let currentFilter = null;
 let ALL_CATEGORIES = [];
 
+// ============= Nouveau : Mode guidé =============
+const GUIDED_STEPS = [
+  { key:'frame',               label:'Frame',           category:'frames' },
+  { key:'motors',              label:'Moteurs',         category:'motors' },
+  { key:'batteries',           label:'Batteries',       category:'batteries' },
+  { key:'esc',                 label:'ESC',             category:'escs' },
+  { key:'flight_controller',   label:'Flight Ctrl',     category:'flight_controllers' },
+  { key:'gps_module',          label:'GPS (optionnel)', category:'gps_modules', optional:true },
+  { key:'fpv_camera',          label:'FPV Cam',         category:'fpv_cameras' },
+  { key:'vtx',                 label:'VTX',             category:'vtx' },
+  { key:'antennas',            label:'Antennes',        category:'antennas' },
+  { key:'receiver',            label:'Récepteur',       category:'receivers' },
+  { key:'radio',               label:'Radio (optionnel)', category:'radios', optional:true },
+  { key:'goggles',             label:'Goggles (optionnel)', category:'goggles', optional:true },
+  { key:'propellers',          label:'Hélices',         category:'propellers' },
+  { key:'charger',             label:'Chargeur',        category:'chargers' },
+  { key:'buzzer',              label:'Buzzer',          category:'buzzers' },
+];
+let isGuided = false;
+let guidedIndex = 0;
+
 // ===============================
 // Console helpers (navigateur)
 // ===============================
@@ -194,7 +215,14 @@ function renderPartsTable(category, docs){
     }
 
     const act=document.createElement('td');
-    act.innerHTML=`<button type="button" class="btn-add">Ajouter</button>`;
+    if (isGuided) {
+      act.innerHTML=`<div class="action-col">
+        <button type="button" class="btn-add">Ajouter</button>
+        <button type="button" class="btn-add-next">Ajouter & Suivant ▶</button>
+      </div>`;
+    } else {
+      act.innerHTML=`<button type="button" class="btn-add">Ajouter</button>`;
+    }
     tr.appendChild(act);
 
     tbody.appendChild(tr);
@@ -224,7 +252,7 @@ function makeLazyInSection(fieldPath,title){
   const section=document.createElement('details'); section.className='filter-section'; section.open=false;
   section.dataset.field=fieldPath; section.dataset.kind='in'; section.dataset.loaded='false';
   const labelId=mkId('grid',fieldPath);
-  section.innerHTML=`<summary><span class="kv-key">${escapeHtml(title||fieldPath)}</span></summary>
+  section.innerHTML=`<summary><span class="kv-key">${escapeHtml(title||fieldPath)}</span>${fieldPath.includes('(optionnel)')?'<span class="tag-optional">Optionnel</span>':''}</summary>
     <div class="check-grid" id="${labelId}"><div class="muted">— Ouvrir pour charger —</div></div>`;
   section.addEventListener('toggle',()=>{ if(section.open) lazyLoadInSection(section); });
   return section;
@@ -328,7 +356,7 @@ function applyFilters(){
 function resetFilters(){ console.log(`%cUI %cresetFilters`, TAG_UI, 'color:#69f'); currentFilter=null; for(const k of Object.keys(cache)) delete cache[k]; loadAndRenderCategory(); closeModal(); }
 
 // ===============================
-// Events
+// Events (mode libre + guidé)
 // ===============================
 async function loadAndRenderCategory(){
   const category=document.getElementById('selectCategory').value;
@@ -351,16 +379,24 @@ function onCategoryChange(){
 }
 
 function handleTableClick(e){
-  const btn=e.target.closest('.btn-add'); if(!btn) return;
-  const tr=btn.closest('tr'); if(!tr) return;
+  const addNext=e.target.closest('.btn-add-next');
+  const btn=e.target.closest('.btn-add');
+  if(!btn && !addNext) return;
+
+  const tr=(btn||addNext).closest('tr'); if(!tr) return;
   const cat=tr.dataset.category;
   const item=JSON.parse(decodeURIComponent(tr.dataset.item||'%7B%7D'));
   const qtyInput=tr.querySelector('.qty');
   const qty=sanitizeQty(qtyInput?.value);
-  upsertSelection(cat,item,qty);
+  upsertSelection(cat,item,qty || 1); // si 0 => on met 1 pour guidé
   if(qtyInput) qtyInput.value=0;
-  console.log(`%cUI %caddToBuild`, TAG_UI, 'color:#69f', {category:cat, id:item._id, qty});
+  console.log(`%cUI %caddToBuild`, TAG_UI, 'color:#69f', {category:cat, id:item._id, qty: qty || 1});
   renderBuild();
+
+  // En mode guidé : option "Ajouter & Suivant"
+  if (addNext && isGuided) {
+    guidedNext();
+  }
 }
 function handleBuildClick(e){
   const btn=e.target.closest('.btn-remove');
@@ -425,6 +461,95 @@ function downloadJson(jsonObj){
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
 
+// ============= Mode guidé : UI & navigation =============
+function guidedSetCategory(index){
+  guidedIndex = Math.max(0, Math.min(index, GUIDED_STEPS.length - 1));
+  const step = GUIDED_STEPS[guidedIndex];
+  // force la catégorie du select (désactivé visuellement)
+  const sel = document.getElementById('selectCategory');
+  sel.value = step.category;
+  onCategoryChange();
+  updateGuidedUI();
+}
+function guidedPrev(){
+  if (guidedIndex > 0) guidedSetCategory(guidedIndex - 1);
+}
+function guidedNext(){
+  if (guidedIndex < GUIDED_STEPS.length - 1) {
+    guidedSetCategory(guidedIndex + 1);
+  } else {
+    // dernière étape -> focus recap
+    document.getElementById('resultConfig').scrollIntoView({ behavior:'smooth' });
+  }
+}
+function guidedSkip(){
+  // on avance d'une étape sans sélectionner (autorisé même si non optionnel)
+  guidedNext();
+}
+function updateGuidedUI(){
+  const info = document.getElementById('guidedInfo');
+  const stepsEl = document.getElementById('guidedSteps');
+  const btnPrev = document.getElementById('guidedPrev');
+  const btnNext = document.getElementById('guidedNext');
+  const btnSkip = document.getElementById('guidedSkip');
+  const btnFinish = document.getElementById('guidedFinish');
+
+  const step = GUIDED_STEPS[guidedIndex];
+  info.textContent = `Étape ${guidedIndex+1}/${GUIDED_STEPS.length} — ${step.label}`;
+
+  // rendu des pastilles
+  stepsEl.innerHTML = '';
+  GUIDED_STEPS.forEach((s, i) => {
+    const done = Object.keys(ensureCatMap(s.category)).length > 0;
+    const div = document.createElement('button');
+    div.type = 'button';
+    div.className = 'guided-step' + (i===guidedIndex ? ' is-current' : '') + (done?' is-done':'');
+    div.setAttribute('role','tab');
+    div.setAttribute('aria-selected', i===guidedIndex ? 'true' : 'false');
+    div.title = s.label;
+    div.innerHTML = `
+      <span class="dot"></span>
+      <span class="lbl">${escapeHtml(s.label)}</span>
+      ${s.optional ? '<span class="opt">opt</span>' : ''}
+    `;
+    div.addEventListener('click', () => guidedSetCategory(i));
+    stepsEl.appendChild(div);
+  });
+
+  btnPrev.disabled = guidedIndex === 0;
+  const last = guidedIndex === GUIDED_STEPS.length - 1;
+  btnNext.classList.toggle('hidden', last);
+  btnFinish.classList.toggle('hidden', !last);
+  btnSkip.classList.toggle('is-ghost', true);
+  // afficher "Ignorer l'étape" seulement si optionnel, sinon toujours possible mais on laisse le bouton quand même :
+  btnSkip.textContent = step.optional ? 'Ignorer (optionnel)' : 'Continuer sans sélectionner';
+}
+
+function enterGuidedMode(){
+  isGuided = true;
+  document.getElementById('guidedBar').classList.remove('hidden');
+  document.getElementById('guidedBar').setAttribute('aria-hidden','false');
+  document.getElementById('modeFree').classList.remove('active');
+  document.getElementById('modeGuided').classList.add('active');
+
+  // désactiver visuellement le select de catégorie (mais on le garde pour accessibilité)
+  document.getElementById('selectCategory').setAttribute('disabled','disabled');
+
+  guidedSetCategory(0);
+}
+function exitGuidedMode(){
+  isGuided = false;
+  document.getElementById('guidedBar').classList.add('hidden');
+  document.getElementById('guidedBar').setAttribute('aria-hidden','true');
+  document.getElementById('modeGuided').classList.remove('active');
+  document.getElementById('modeFree').classList.add('active');
+
+  // réactiver le select catégorie
+  document.getElementById('selectCategory').removeAttribute('disabled');
+
+  // ne pas toucher aux filtres ni aux sélections
+}
+
 // ===============================
 // Init
 // ===============================
@@ -453,27 +578,49 @@ async function init(){
   // Champs généraux
   document.getElementById('addGeneralField').addEventListener('click', addGeneralField);
 
-  // Validation -> JSON
-  document.getElementById('btnValider').addEventListener('click', ()=>{
+  // Validation -> JSON + envoi (optionnel)
+  async function envoyerSetupAuServeur(payload) {
+    const res = await fetch('/api/droneFpvAdd', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  document.getElementById('btnValider').addEventListener('click', async () => {
     const payload = buildPayload();
     console.log('%cUI %cvalidateBuild', TAG_UI, 'color:#69f', payload);
     openJsonModal(payload);
-    ////////////
 
-
+    try {
+      const res = await envoyerSetupAuServeur(payload);
+      console.log('Insert OK:', res);
+    } catch (e) {
+      console.error('Erreur insert:', e);
+    }
   });
 
-
-
-
-
-
-
+  // JSON modal
   document.getElementById('closeJson').addEventListener('click', closeJsonModal);
   document.getElementById('jsonModal').addEventListener('click', (e)=>{ if(e.target.id==='jsonModal') closeJsonModal(); });
   document.getElementById('downloadJson').addEventListener('click', ()=>{
     const payload = buildPayload();
     downloadJson(payload);
+  });
+
+  // Mode toggle
+  document.getElementById('modeFree').addEventListener('click', () => exitGuidedMode());
+  document.getElementById('modeGuided').addEventListener('click', () => enterGuidedMode());
+
+  // Guided actions
+  document.getElementById('guidedPrev').addEventListener('click', guidedPrev);
+  document.getElementById('guidedNext').addEventListener('click', guidedNext);
+  document.getElementById('guidedSkip').addEventListener('click', guidedSkip);
+  document.getElementById('guidedFinish').addEventListener('click', () => {
+    // Terminer : on remonte au récap
+    document.getElementById('resultConfig').scrollIntoView({ behavior:'smooth' });
   });
 
   renderBuild();

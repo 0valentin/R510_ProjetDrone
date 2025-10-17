@@ -11,61 +11,68 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ---- Helper de log par handler ----
+// Collections (configurables via .env)
+const COL_PARTS  = process.env.COL_PARTS  || 'droneFpv';     // catalogue de pièces
+const COL_BUILDS = process.env.COL_BUILDS || 'droneBuilds';  // créations / setups (NOUVELLE collection)
+
+// ---- Helper log par handler ----
 function logCall(fnName, req) {
   console.log(`▶ ${fnName}: ${req.method} ${req.originalUrl}`);
 }
 
+// Middlewares
 app.use(helmet());
 app.use(morgan('dev'));
+app.use(express.json({ limit: '2mb' })); // JSON body pour PUT/POST
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ---------------- Pages ----------------
-function healthHandler(req, res) {
+app.get('/health', (req, res) => {
   logCall('healthHandler', req);
   res.json({ ok: true });
-}
-app.get('/health', healthHandler);
+});
 
-function homePageHandler(_req, res) {
+app.get('/', (_req, res) => {
   console.log('▶ homePageHandler: GET /');
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-}
-app.get('/', homePageHandler);
+});
 
-function constructeurPageHandler(_req, res) {
+app.get('/constructeur', (_req, res) => {
   console.log('▶ constructeurPageHandler: GET /constructeur');
   res.sendFile(path.join(__dirname, '..', 'public', 'constructeur.html'));
-}
-app.get('/constructeur', constructeurPageHandler);
+});
 
-// ------------- Debug simple -------------
-async function droneFpvHandler(req, res, next) {
+// ============ Helpers =============
+const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
+
+// ============ API DEBUG ============
+app.get('/api/droneFpv', async (req, res, next) => {
   logCall('droneFpvHandler', req);
   try {
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
     const limit = Math.min(parseInt(req.query.limit || '500', 10), 2000);
     const docs = await col.find({}).limit(limit).toArray();
     res.json(docs);
   } catch (err) { next(err); }
-}
-app.get('/api/droneFpv', droneFpvHandler);
+});
 
-// --------- DISTINCT des catégories ---------
-async function categoriesHandler(req, res, next) {
+// ============ CATEGORIES ============
+app.get('/api/categories', async (req, res, next) => {
   logCall('categoriesHandler', req);
   try {
     await connect();
-    const col = getCollection('droneFpv');
-    const categories = await col.distinct('category');
-    res.json(categories || []);
+    const col = getCollection(COL_PARTS);
+    const raw = await col.distinct('category');
+    const values = Array.from(
+      new Set((raw || []).map(v => String(v).trim()).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    res.json(values);
   } catch (err) { next(err); }
-}
-app.get('/api/categories', categoriesHandler);
+});
 
-// --------- DISTINCT multi-champs ---------
-async function distinctHandler(req, res, next) {
+// ============ DISTINCT multi-champs (par catégorie) ============
+app.get('/api/distinct', async (req, res, next) => {
   logCall('distinctHandler', req);
   try {
     const category = String(req.query.category || '').trim();
@@ -75,8 +82,6 @@ async function distinctHandler(req, res, next) {
     if (!category || !fields.length) {
       return res.status(400).json({ error: 'Paramètres "category" et "fields" requis' });
     }
-
-    const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
     for (const f of fields) {
       if (!SAFE_KEY_RE.test(f)) {
         return res.status(400).json({ error: `Champ invalide: ${f}` });
@@ -84,30 +89,35 @@ async function distinctHandler(req, res, next) {
     }
 
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
     const out = {};
     for (const f of fields) {
-      out[f] = await col.distinct(f, { category });
+      const raw = await col.distinct(f, { category });
+      out[f] = Array.from(
+        new Set((raw || [])
+          .filter(v => v !== null && v !== undefined)
+          .map(v => String(v).trim())
+          .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     }
     res.json(out);
   } catch (err) { next(err); }
-}
-app.get('/api/distinct', distinctHandler);
+});
 
-// --------- RANGE min/max ---------
-async function rangeHandler(req, res, next) {
+// ============ RANGE min/max (numérique) ============
+app.get('/api/range', async (req, res, next) => {
   logCall('rangeHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     const field = String(req.query.field || '').trim();
-    const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
 
     if (!category || !field || !SAFE_KEY_RE.test(field)) {
       return res.status(400).json({ error: 'Paramètres "category" et "field" requis' });
     }
 
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
 
     const pipeline = [
       { $match: { category, [field]: { $type: 'number' } } },
@@ -117,18 +127,17 @@ async function rangeHandler(req, res, next) {
     const [result] = await col.aggregate(pipeline).toArray();
     res.json(result || { min: null, max: null });
   } catch (err) { next(err); }
-}
-app.get('/api/range', rangeHandler);
+});
 
-// --------- Keys dans specs ---------
-async function specKeysHandler(req, res, next) {
+// ============ Keys dans specs ============
+app.get('/api/spec-keys', async (req, res, next) => {
   logCall('specKeysHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" requis' });
 
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
 
     const pipeline = [
       { $match: { category, specs: { $type: 'object' } } },
@@ -141,18 +150,17 @@ async function specKeysHandler(req, res, next) {
     const rows = await col.aggregate(pipeline).toArray();
     res.json(rows.map(r => r.key));
   } catch (err) { next(err); }
-}
-app.get('/api/spec-keys', specKeysHandler);
+});
 
-// --------- Keys dans compat ---------
-async function compatKeysHandler(req, res, next) {
+// ============ Keys dans compat ============
+app.get('/api/compat-keys', async (req, res, next) => {
   logCall('compatKeysHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" requis' });
 
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
 
     const pipeline = [
       { $match: { category, compat: { $type: 'object' } } },
@@ -165,18 +173,17 @@ async function compatKeysHandler(req, res, next) {
     const rows = await col.aggregate(pipeline).toArray();
     res.json(rows.map(r => r.key));
   } catch (err) { next(err); }
-}
-app.get('/api/compat-keys', compatKeysHandler);
+});
 
-// --------- Keys "générales" ---------
-async function fieldKeysHandler(req, res, next) {
+// ============ Keys "générales" (scalar/numeric) ============
+app.get('/api/field-keys', async (req, res, next) => {
   logCall('fieldKeysHandler', req);
   try {
     const category = String(req.query.category || '').trim();
     if (!category) return res.status(400).json({ error: 'Paramètre "category" requis' });
 
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
 
     const pipeline = [
       { $match: { category } },
@@ -213,11 +220,10 @@ async function fieldKeysHandler(req, res, next) {
       numeric: [...new Set(numeric)].sort()
     });
   } catch (err) { next(err); }
-}
-app.get('/api/field-keys', fieldKeysHandler);
+});
 
-// --------- Parts (filtre JSON) ---------
-async function partsHandler(req, res, next) {
+// ============ Parts (filtre JSON + catégorie) ============
+app.get('/api/parts', async (req, res, next) => {
   logCall('partsHandler', req);
   try {
     const category = String(req.query.category || '').trim();
@@ -233,7 +239,6 @@ async function partsHandler(req, res, next) {
       }
     }
 
-    const SAFE_KEY_RE = /^[a-zA-Z0-9_.\-]+$/;
     for (const k of Object.keys(extraFilter)) {
       if (!SAFE_KEY_RE.test(k) && !k.startsWith('$')) {
         return res.status(400).json({ error: `Clé de filtre non autorisée: ${k}` });
@@ -241,55 +246,62 @@ async function partsHandler(req, res, next) {
     }
 
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
     const limit = Math.min(parseInt(req.query.limit || '1000', 10), 5000);
     const query = Object.assign({ category }, extraFilter);
     const docs = await col.find(query).limit(limit).toArray();
     res.json(docs);
   } catch (err) { next(err); }
-}
-app.get('/api/parts', partsHandler);
+});
 
-// ====== Nouveau handler issu du conflit, renommé en *2* ======
-// Liste paginée générique (GET /api/parts2?page=&limit=&...filtres plats...)
-async function partsHandler2(req, res, next) {
-  logCall('partsHandler2', req);
+// ============ Pagination générique (pour /public/main.js) ============
+app.get('/api/pieces', async (req, res, next) => {
+  logCall('piecesHandler', req);
   try {
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_PARTS);
 
     // Pagination
     const page  = Math.max(parseInt(req.query.page  || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '24', 10), 1), 200);
     const skip  = (page - 1) * limit;
 
-    // Builder générique des filtres à partir de la query (clé=valeur)
+    // Filtres génériques à partir des query params
     const filter = {};
     for (const [key, raw] of Object.entries(req.query)) {
-      if (key === 'page' || key === 'limit') continue;
+      if (key === 'page' || key === 'limit') continue; // ignore pagination
+      if (key.startsWith('$')) continue; // sécurité injection
+
       const val = String(raw).trim();
       if (val === '') continue;
 
+      // recherche partielle sur "name"
       if (key.toLowerCase() === 'name') {
         filter[key] = { $regex: val, $options: 'i' };
         continue;
       }
+
+      // listes "a,b,c" => $in
       if (val.includes(',')) {
         const arr = val.split(',').map(s => s.trim()).filter(Boolean);
         if (arr.length) filter[key] = { $in: arr };
         continue;
       }
+
+      // booléens
       if (/^(true|false)$/i.test(val)) {
         filter[key] = val.toLowerCase() === 'true';
         continue;
       }
+
+      // égalité simple
       filter[key] = val;
     }
 
     const totalDocs = await col.countDocuments(filter);
     const items = await col
       .find(filter)
-      .sort({ view: 1 })
+      .sort({ view: 1, _id: 1 })
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -297,27 +309,63 @@ async function partsHandler2(req, res, next) {
     const totalPages = Math.max(1, Math.ceil(totalDocs / limit));
     const hasPrevPage = page > 1;
     const hasNextPage = page < totalPages;
+    const prevPage = hasPrevPage ? page - 1 : null;
+    const nextPage = hasNextPage ? page + 1 : null;
 
-    res.json({ items, page, limit, totalDocs, totalPages, hasPrevPage, hasNextPage });
+    res.json({
+      items,
+      totalDocs,
+      totalPages,
+      page,
+      limit,
+      hasPrevPage,
+      hasNextPage,
+      prevPage,
+      nextPage,
+    });
   } catch (err) { next(err); }
-}
-app.get('/api/parts2', partsHandler2);
+});
 
-// IMPORTANT : parser JSON (pour les PUT/POST qui suivent)
-app.use(express.json({ limit: '2mb' }));
+// ============ DISTINCT d'un champ (pour /public/main.js) ============
+app.get('/api/pieces/distinct/:field', async (req, res, next) => {
+  logCall('piecesDistinctHandler', req);
+  try {
+    await connect();
+    const col = getCollection(COL_PARTS);
 
-// ---- Enregistrer / insérer via REQUÊTE MongoDB (upsert) ----
+    const field = String(req.params.field || '').trim();
+    if (!field || !SAFE_KEY_RE.test(field)) {
+      return res.status(400).json({ error: 'Attribut invalide.' });
+    }
+
+    const raw = await col.distinct(field);
+    const values = Array.from(
+      new Set(
+        (raw || [])
+          .filter(v => v !== null && v !== undefined)
+          .map(v => String(v).trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+    res.json({ field, values });
+  } catch (err) { next(err); }
+});
+
+// ============ Upsert (insert/update) ============
+// On garde l'URL /api/droneFpvAdd (utilisée par le front) mais on écrit dans COL_BUILDS
 app.put('/api/droneFpvAdd', async (req, res, next) => {
   logCall('droneFpvAdd', req);
   try {
     await connect();
-    const col = getCollection('droneFpv');
+    const col = getCollection(COL_BUILDS); // ← nouvelle collection pour les créations
 
     const payload = req.body;
     if (!payload || typeof payload !== 'object') {
       return res.status(400).json({ error: 'Corps JSON requis' });
     }
 
+    // Tableau -> bulkWrite
     if (Array.isArray(payload)) {
       if (!payload.length) return res.status(400).json({ error: 'Tableau vide' });
 
@@ -342,9 +390,11 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
         modifiedCount: r.modifiedCount,
         upsertedCount: r.upsertedCount,
         upsertedIds: r.upsertedIds,
+        collection: COL_BUILDS,
       });
     }
 
+    // Objet unique
     const filter = payload._id
       ? { _id: payload._id }
       : { _id: `${payload.category || 'item'}_${Date.now()}_${Math.random().toString(36).slice(2)}` };
@@ -357,6 +407,7 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
       matchedCount: result.matchedCount,
       modifiedCount: result.modifiedCount,
       upsertedId: result.upsertedId || (payload._id || filter._id),
+      collection: COL_BUILDS,
     });
   } catch (err) {
     if (err && err.code === 11000) {
@@ -366,13 +417,25 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
   }
 });
 
-// ------------- Erreurs -------------
-function errorHandler(err, req, res, _next) {
+// (Optionnel) Lecture des builds pour vérif rapide
+app.get('/api/builds', async (req, res, next) => {
+  logCall('buildsList', req);
+  try {
+    await connect();
+    const col = getCollection(COL_BUILDS);
+    const limit = Math.min(parseInt(req.query.limit || '100', 10), 1000);
+    const items = await col.find({}).sort({ created_at: -1 }).limit(limit).toArray();
+    res.json({ items, total: items.length, collection: COL_BUILDS });
+  } catch (err) { next(err); }
+});
+
+// ------------- Gestion des erreurs -------------
+app.use((err, req, res, _next) => {
   console.error('✖ errorHandler:', err);
   res.status(500).json({ error: 'Erreur serveur', details: err.message });
-}
-app.use(errorHandler);
+});
 
 app.listen(PORT, () => {
   console.log(`➡️  Serveur démarré sur http://localhost:${PORT}`);
+  console.log(`   COL_PARTS=${COL_PARTS} | COL_BUILDS=${COL_BUILDS}`);
 });

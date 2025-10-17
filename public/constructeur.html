@@ -52,6 +52,31 @@
       </div>
     </section>
 
+    <!-- Sélecteur de mode -->
+    <section class="mode-toggle">
+      <button id="modeFree" class="seg active" type="button" title="Choisir librement les catégories">Mode libre</button>
+      <button id="modeGuided" class="seg" type="button" title="Montage guidé étape par étape">Mode guidé</button>
+    </section>
+
+    <!-- Barre guidée (étapes) -->
+    <section id="guidedBar" class="guided hidden" aria-hidden="true">
+      <div class="guided-head">
+        <div id="guidedInfo" class="guided-info">Étape 1/… – …</div>
+        <div class="guided-actions">
+          <button id="guidedPrev" type="button">◀ Précédent</button>
+          <button id="guidedSkip" type="button" class="is-ghost">Ignorer l’étape</button>
+          <button id="guidedNext" type="button" class="btn-primary">Suivant ▶</button>
+          <button id="guidedFinish" type="button" class="btn-success hidden">Terminer ✔</button>
+        </div>
+      </div>
+      <div class="guided-steps" id="guidedSteps" role="tablist" aria-label="Étapes du montage">
+        <!-- rendu dynamique -->
+      </div>
+      <div class="guided-note">
+        La catégorie affichée est contrôlée par le mode guidé. Vous pouvez tout de même ouvrir les filtres.
+      </div>
+    </section>
+
     <h2>Choisir les pièces</h2>
 
     <!-- Contrôles -->

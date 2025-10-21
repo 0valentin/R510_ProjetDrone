@@ -8,13 +8,19 @@
 </head>
 <body>
   <main class="container">
+    <!-- NAV / HEADER identique à la première page -->
     <header class="header">
-      <h1>Résultats: <code>projet.droneFpv.find()</code></h1>
-      <div class="actions">
-        <button id="refreshBtn" type="button">Rafraîchir</button>
+      <div class="brand">
+        <h1>DroneFpv</h1>
+        <p class="subtitle">Résultats&nbsp;: <code>projet.droneFpv.find()</code></p>
       </div>
-      <nav class="nav"><a href="/constructeur" class="btn-link">Constructeurs</a></nav>
-        </header>
+      <nav class="nav">
+        <a class="btn-link" href="/">Composants</a>
+        <a class="btn-link" href="/constructeur">Constructeur</a>
+        <a class="btn-link" href="/builder">Drones</a>
+        <button id="refreshBtn" type="button" class="btn-link as-button">Rafraîchir</button>
+      </nav>
+    </header>
 
     <div id="status" class="status">Chargement…</div>
 

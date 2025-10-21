@@ -589,18 +589,58 @@ async function init(){
     return res.json();
   }
 
-  document.getElementById('btnValider').addEventListener('click', async () => {
-    const payload = buildPayload();
-    console.log('%cUI %cvalidateBuild', TAG_UI, 'color:#69f', payload);
-    openJsonModal(payload);
+  // --- Validation des champs requis ---
+function validateMetaRequired() {
+  const nameInput = document.getElementById('setupName');
+  const creatorInput = document.getElementById('creatorName');
+  const err = document.getElementById('metaError');
 
-    try {
-      const res = await envoyerSetupAuServeur(payload);
-      console.log('Insert OK:', res);
-    } catch (e) {
-      console.error('Erreur insert:', e);
+  let ok = true;
+
+  // reset états
+  [nameInput, creatorInput].forEach(inp => inp.classList.remove('is-invalid'));
+
+  if (!nameInput.value.trim()) {
+    nameInput.classList.add('is-invalid');
+    ok = false;
+  }
+  if (!creatorInput.value.trim()) {
+    creatorInput.classList.add('is-invalid');
+    ok = false;
+  }
+
+  if (!ok) {
+    if (err) {
+      err.style.display = '';
+      err.textContent = 'Veuillez renseigner « Nom du setup » et « Créateur » avant de valider.';
     }
-  });
+    // focus sur le premier champ manquant
+    (!nameInput.value.trim() ? nameInput : creatorInput).focus();
+    return false;
+  } else if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+  return true;
+}
+
+
+ document.getElementById('btnValider').addEventListener('click', async () => {
+  // -- Vérifie les champs requis --
+  if (!validateMetaRequired()) return;
+
+  const payload = buildPayload();
+  console.log('%cUI %cvalidateBuild', TAG_UI, 'color:#69f', payload);
+  openJsonModal(payload);
+
+  try {
+    const res = await envoyerSetupAuServeur(payload);
+    console.log('Insert OK:', res);
+  } catch (e) {
+    console.error('Erreur insert:', e);
+  }
+});
+
 
   // JSON modal
   document.getElementById('closeJson').addEventListener('click', closeJsonModal);

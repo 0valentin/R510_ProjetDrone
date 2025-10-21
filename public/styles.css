@@ -1,13 +1,52 @@
-:root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji"; }
-body { margin: 0; background: #0b0f17; color: #e7ecf3; }
+:root{
+  --bg:#0b0f17;--panel:#0f1724;--panel2:#0d1422;--text:#e7ecf3;--muted:#a9b7d0;
+  --border:#182235;--accent:#7aa2ff;--accent2:#93b4ff;--shadow:rgba(0,0,0,.35);
+  --radius:14px;--rsm:10px;--sp1:6px;--sp2:10px;--sp3:14px;--sp4:18px;--sp5:24px;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+
+/* Container */
 .container { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
-h1 { font-size: 1.6rem; margin: 0; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
-.actions button { background: #26324a; color: #e7ecf3; border: 1px solid #334362; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
-.actions button:hover { filter: brightness(1.1); }
+
+/* Header (identique au style de la page builds) */
+.header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  padding:20px 0 12px;margin:0 0 18px;border-bottom:1px solid var(--border);
+}
+.header h1{
+  margin:0;font-size:clamp(20px,2.2vw,28px);
+  background:linear-gradient(90deg,#fff,var(--accent2));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.subtitle{margin:6px 0 0;color:var(--muted);font-size:14px}
+.nav{display:flex;gap:8px}
+.btn-link{
+  appearance:none;border:1px solid var(--border);border-radius:10px;
+  padding:8px 12px;background:linear-gradient(180deg,#121b2b,#0e1624);
+  color:var(--text);text-decoration:none;box-shadow:0 10px 30px var(--shadow);
+  cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+}
+/* pour que le bouton "Rafraîchir" ait le même rendu qu'un lien nav */
+.btn-link.as-button { line-height: 1; }
+
+/* Status + table */
 .status { margin-bottom: 12px; opacity: 0.9; }
-.table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
-table { width: 100%; border-collapse: collapse; background: #0f1724; }
-th, td { padding: 10px 12px; border-bottom: 1px solid #182235; vertical-align: top; }
-th { position: sticky; top: 0; background: #0d1422; text-align: left; font-weight: 600; }
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px var(--shadow);
+}
+table { width: 100%; border-collapse: collapse; background: var(--panel); }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th {
+  position: sticky; top: 0; background: var(--panel2);
+  text-align: left; font-weight: 600;
+}
 pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; color: #d1e0ff; }
+
+/* Hover states optionnels */
+.btn-link:hover { filter: brightness(1.05); }
+.table-wrapper table tr:hover td { background: rgba(255,255,255,0.02); }

@@ -11,8 +11,9 @@
   <header class="header">
     <h1>🚁 DroneBuilder</h1>
     <nav class="nav">
-      <a href="/" class="btn-link">Accueil</a>
-      <a href="/constructeur" class="btn-link">Créer un drone</a>
+      <a class="btn-link" href="/">Composants</a>
+      <a class="btn-link" href="/constructeur">Constructeur</a>
+      <a class="btn-link" href="/builder">Drones</a>
     </nav>
   </header>
 
@@ -25,11 +26,11 @@
       <div class="form-config" style="margin-bottom:12px;">
         <label>
           Nom du setup :
-          <input id="setupName" type="text" placeholder="Ex. Freestyle 5 pouces" />
+          <input id="setupName" type="text" placeholder="Ex. Freestyle 5 pouces" required />
         </label>
         <label>
           Créateur :
-          <input id="creatorName" type="text" placeholder="Ton nom / pseudo" />
+          <input id="creatorName" type="text" placeholder="Ton nom / pseudo" required />
         </label>
         <label>
           Type :

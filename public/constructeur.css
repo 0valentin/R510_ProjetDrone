@@ -384,6 +384,21 @@ footer {
   padding: 8px 10px;
 }
 
+
+
+/* État d'erreur pour les champs requis */
+.is-invalid {
+  border-color: #ff6b6b !important;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, .2);
+}
+.form-error {
+  margin-top: 8px;
+  color: #ff9b9b;
+  font-size: 12px;
+}
+
+
+
 .modal-actions {
   display: flex;
   gap: 10px;

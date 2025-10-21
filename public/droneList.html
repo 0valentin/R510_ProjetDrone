@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Liste des Drone Builds</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/droneList.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <h1>Drone Builds</h1>
+      <p class="subtitle">Parcourir, filtrer et ouvrir un build détaillé</p>
+    </div>
+    <nav class="nav">
+      <a class="btn-link" href="/">Composants</a>
+      <a class="btn-link" href="/constructeur">Constructeur</a>
+      <a class="btn-link" href="/builder">Drones</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- FILTRES -->
+    <section class="filters">
+      <div class="field">
+        <label for="filtreNom">Nom</label>
+        <input id="filtreNom" type="text" placeholder="Rechercher par nom…" />
+      </div>
+
+      <div class="field">
+        <label for="filtreCreateur">Créateur</label>
+        <select id="filtreCreateur" data-loaded="false">
+          <option value="">— Cliquer pour charger —</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="filtreType">Type</label>
+        <select id="filtreType" data-loaded="false">
+          <option value="">— Cliquer pour charger —</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Prix total (EUR)</label>
+        <div class="range">
+          <input id="filtrePrixMin" type="number" placeholder="Min" step="0.01" />
+          <span>—</span>
+          <input id="filtrePrixMax" type="number" placeholder="Max" step="0.01" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnReset">Réinitialiser</button>
+        <button id="btnAppliquer" class="btn-primary">Appliquer</button>
+      </div>
+    </section>
+
+    <!-- LISTE -->
+    <section class="list-panel">
+      <div class="list-head">
+        <div class="left">
+          <h2>Résultats</h2>
+          <div id="status" class="muted">—</div>
+        </div>
+        <div class="right">
+          <label for="pageSize" class="muted">Taille page</label>
+          <select id="pageSize">
+            <option>12</option>
+            <option selected>24</option>
+            <option>48</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="cards" class="card-grid"></div>
+
+      <div class="pagination">
+        <button id="prevPage">◀ Précédent</button>
+        <span id="pageInfo" class="muted"></span>
+        <button id="nextPage">Suivant ▶</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL DÉTAIL -->
+  <div id="detailModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="title">
+          <h3 id="detailTitle">Build</h3>
+          <div id="detailMeta" class="muted"></div>
+        </div>
+        <button id="closeDetail" class="modal-close" title="Fermer">✖</button>
+      </div>
+
+      <div class="modal-body" id="detailBody"></div>
+
+      <div class="modal-footer">
+        <div id="detailTotal" class="total"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">© Drone Builder</footer>
+
+  <script src="/droneList.js"></script>
+</body>
+</html>

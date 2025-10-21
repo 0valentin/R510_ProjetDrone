@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 
 // Collections (configurables via .env)
 const COL_PARTS  = process.env.COL_PARTS  || 'droneFpv';     // catalogue de pièces
-const COL_BUILDS = process.env.COL_BUILDS || 'droneBuilds';  // créations / setups (NOUVELLE collection)
+const COL_BUILDS = process.env.COL_BUILDS || 'droneBuilds';  // créations / setups
 
 // ---- Helper log par handler ----
 function logCall(fnName, req) {
@@ -40,6 +40,11 @@ app.get('/', (_req, res) => {
 app.get('/constructeur', (_req, res) => {
   console.log('▶ constructeurPageHandler: GET /constructeur');
   res.sendFile(path.join(__dirname, '..', 'public', 'constructeur.html'));
+});
+
+app.get('/builder', (_req, res) => {
+  console.log('▶ builderPageHandler: GET /builder');
+  res.sendFile(path.join(__dirname, '..', 'public', 'droneList.html'));
 });
 
 // ============ Helpers =============
@@ -266,35 +271,28 @@ app.get('/api/pieces', async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '24', 10), 1), 200);
     const skip  = (page - 1) * limit;
 
-    // Filtres génériques à partir des query params
+    // Filtres génériques
     const filter = {};
     for (const [key, raw] of Object.entries(req.query)) {
-      if (key === 'page' || key === 'limit') continue; // ignore pagination
-      if (key.startsWith('$')) continue; // sécurité injection
+      if (key === 'page' || key === 'limit') continue;
+      if (key.startsWith('$')) continue;
 
       const val = String(raw).trim();
       if (val === '') continue;
 
-      // recherche partielle sur "name"
       if (key.toLowerCase() === 'name') {
         filter[key] = { $regex: val, $options: 'i' };
         continue;
       }
-
-      // listes "a,b,c" => $in
       if (val.includes(',')) {
         const arr = val.split(',').map(s => s.trim()).filter(Boolean);
         if (arr.length) filter[key] = { $in: arr };
         continue;
       }
-
-      // booléens
       if (/^(true|false)$/i.test(val)) {
         filter[key] = val.toLowerCase() === 'true';
         continue;
       }
-
-      // égalité simple
       filter[key] = val;
     }
 
@@ -307,21 +305,16 @@ app.get('/api/pieces', async (req, res, next) => {
       .toArray();
 
     const totalPages = Math.max(1, Math.ceil(totalDocs / limit));
-    const hasPrevPage = page > 1;
-    const hasNextPage = page < totalPages;
-    const prevPage = hasPrevPage ? page - 1 : null;
-    const nextPage = hasNextPage ? page + 1 : null;
-
     res.json({
       items,
       totalDocs,
       totalPages,
       page,
       limit,
-      hasPrevPage,
-      hasNextPage,
-      prevPage,
-      nextPage,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+      prevPage: page > 1 ? page - 1 : null,
+      nextPage: page < totalPages ? page + 1 : null,
     });
   } catch (err) { next(err); }
 });
@@ -353,19 +346,17 @@ app.get('/api/pieces/distinct/:field', async (req, res, next) => {
 });
 
 // ============ Upsert (insert/update) ============
-// On garde l'URL /api/droneFpvAdd (utilisée par le front) mais on écrit dans COL_BUILDS
 app.put('/api/droneFpvAdd', async (req, res, next) => {
   logCall('droneFpvAdd', req);
   try {
     await connect();
-    const col = getCollection(COL_BUILDS); // ← nouvelle collection pour les créations
+    const col = getCollection(COL_BUILDS); // écrit dans la collection des builds
 
     const payload = req.body;
     if (!payload || typeof payload !== 'object') {
       return res.status(400).json({ error: 'Corps JSON requis' });
     }
 
-    // Tableau -> bulkWrite
     if (Array.isArray(payload)) {
       if (!payload.length) return res.status(400).json({ error: 'Tableau vide' });
 
@@ -394,7 +385,6 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
       });
     }
 
-    // Objet unique
     const filter = payload._id
       ? { _id: payload._id }
       : { _id: `${payload.category || 'item'}_${Date.now()}_${Math.random().toString(36).slice(2)}` };
@@ -417,15 +407,134 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
   }
 });
 
-// (Optionnel) Lecture des builds pour vérif rapide
+// ================== BUILDS: liste + filtres (UNE SEULE FOIS) ==================
 app.get('/api/builds', async (req, res, next) => {
   logCall('buildsList', req);
   try {
     await connect();
     const col = getCollection(COL_BUILDS);
-    const limit = Math.min(parseInt(req.query.limit || '100', 10), 1000);
-    const items = await col.find({}).sort({ created_at: -1 }).limit(limit).toArray();
-    res.json({ items, total: items.length, collection: COL_BUILDS });
+
+    // Pagination
+    const page  = Math.max(parseInt(req.query.page  || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '24', 10), 1), 200);
+    const skip  = (page - 1) * limit;
+
+    // Filtres
+    const filter = {};
+    const name    = (req.query.name || '').trim();
+    const creator = (req.query.creator || '').trim();
+    const type    = (req.query.type || '').trim();
+    const minp    = parseFloat(req.query.min_price);
+    const maxp    = parseFloat(req.query.max_price);
+
+    if (name)    filter.name    = { $regex: name, $options: 'i' };
+    if (creator) filter.creator = creator;
+    if (type)    filter.type    = type;
+
+    if (!Number.isNaN(minp) || !Number.isNaN(maxp)) {
+      filter.total_price_eur = {};
+      if (!Number.isNaN(minp)) filter.total_price_eur.$gte = minp;
+      if (!Number.isNaN(maxp)) filter.total_price_eur.$lte = maxp;
+    }
+
+    // Projection "summary" si demandé
+    const summary = (req.query.summary || '') === '1';
+    const projection = summary
+      ? { _id: 1, name: 1, creator: 1, type: 1, total_price_eur: 1 }
+      : undefined;
+
+    const totalDocs = await col.countDocuments(filter);
+    const items = await col.find(filter, { projection })
+      .sort({ created_at: -1, _id: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const totalPages = Math.max(1, Math.ceil(totalDocs / limit));
+    res.json({
+      items, totalDocs, totalPages, page, limit,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+      prevPage: page > 1 ? page - 1 : null,
+      nextPage: page < totalPages ? page + 1 : null,
+    });
+  } catch (err) { next(err); }
+});
+
+// ================== BUILDS: distinct ==================
+app.get('/api/builds/distinct/:field', async (req, res, next) => {
+  logCall('buildsDistinct', req);
+  try {
+    await connect();
+    const col = getCollection(COL_BUILDS);
+
+    const field = String(req.params.field || '').trim();
+    if (!field || !SAFE_KEY_RE.test(field)) {
+      return res.status(400).json({ error: 'Champ invalide.' });
+    }
+
+    const raw = await col.distinct(field);
+    const values = Array.from(
+      new Set((raw || [])
+        .filter(v => v !== null && v !== undefined)
+        .map(v => String(v).trim())
+        .filter(Boolean))
+    ).sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:'base' }));
+
+    res.json({ field, values });
+  } catch (err) { next(err); }
+});
+
+// ================== BUILDS: détail ==================
+// 1) Si _id fourni -> recherche par _id (string OU ObjectId)
+// 2) Sinon fallback exact: name + creator + type + total_price_eur
+app.get('/api/builds/detail', async (req, res, next) => {
+  logCall('buildsDetail', req);
+  try {
+    await connect();
+    const col = getCollection(COL_BUILDS);
+
+    const { _id, name, creator, type } = req.query;
+    const total_price_eur = req.query.total_price_eur;
+
+    let doc;
+
+    if (_id) {
+      const q = {};
+      // si c'est un ObjectId valide -> on tente
+      if (/^[0-9a-fA-F]{24}$/.test(String(_id))) {
+        const { ObjectId } = require('mongodb');
+        try {
+          doc = await col.findOne({ _id: new ObjectId(String(_id)) });
+        } catch {
+          // on tentera en string ensuite
+        }
+      }
+      // si pas trouvé ou pas un ObjectId, on tente en string brut
+      if (!doc) {
+        doc = await col.findOne({ _id: String(_id) });
+      }
+    } else {
+      // fallback exact sur les champs
+      const q = {};
+      if (name)    q.name = String(name);
+      if (creator) q.creator = String(creator);
+      if (type)    q.type = String(type);
+      if (total_price_eur !== undefined) {
+        const n = Number(total_price_eur);
+        if (!Number.isFinite(n)) {
+          return res.status(400).json({ error: 'total_price_eur invalide' });
+        }
+        q.total_price_eur = n;
+      }
+      if (!Object.keys(q).length) {
+        return res.status(400).json({ error: 'Paramètres insuffisants' });
+      }
+      doc = await col.findOne(q);
+    }
+
+    if (!doc) return res.status(404).json({ error: 'Build introuvable' });
+    res.json(doc);
   } catch (err) { next(err); }
 });
 

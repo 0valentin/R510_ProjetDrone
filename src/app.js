@@ -1,4 +1,3 @@
-// src/app.js
 const express = require('express');
 const path = require('path');
 const morgan = require('morgan');
@@ -14,6 +13,13 @@ const PORT = process.env.PORT || 3000;
 // Collections (configurables via .env)
 const COL_PARTS  = process.env.COL_PARTS  || 'droneFpv';     // catalogue de pièces
 const COL_BUILDS = process.env.COL_BUILDS || 'droneBuilds';  // créations / setups
+
+/*
+ * NOTE POUR LES COMMENTAIRES CLI
+ * - <COL_PARTS> et <COL_BUILDS> représentent les noms de collections (issus de .env)
+ * - Utilisez db.getCollection('<COL_PARTS>') si le nom est dynamique, sinon db.<nom>.
+ * - Les <placeholders> (ex: <limit>, <filter>) représentent les valeurs calculées dans le handler.
+ */
 
 // ---- Helper log par handler ----
 function logCall(fnName, req) {
@@ -57,6 +63,8 @@ app.get('/api/droneFpv', async (req, res, next) => {
     await connect();
     const col = getCollection(COL_PARTS);
     const limit = Math.min(parseInt(req.query.limit || '500', 10), 2000);
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').find({}, {}).limit(<limit>)
     const docs = await col.find({}).limit(limit).toArray();
     res.json(docs);
   } catch (err) { next(err); }
@@ -68,6 +76,8 @@ app.get('/api/categories', async (req, res, next) => {
   try {
     await connect();
     const col = getCollection(COL_PARTS);
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').distinct('category')
     const raw = await col.distinct('category');
     const values = Array.from(
       new Set((raw || []).map(v => String(v).trim()).filter(Boolean))
@@ -97,6 +107,8 @@ app.get('/api/distinct', async (req, res, next) => {
     const col = getCollection(COL_PARTS);
     const out = {};
     for (const f of fields) {
+      // CLI Mongo équivalent (pour chaque champ f) :
+      // db.getCollection('<COL_PARTS>').distinct('<f>', { category: '<category>' })
       const raw = await col.distinct(f, { category });
       out[f] = Array.from(
         new Set((raw || [])
@@ -129,6 +141,12 @@ app.get('/api/range', async (req, res, next) => {
       { $group: { _id: null, min: { $min: `$${field}` }, max: { $max: `$${field}` } } },
       { $project: { _id: 0, min: 1, max: 1 } }
     ];
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').aggregate([
+    //   { $match: { category: '<category>', <field>: { $type: 'number' } } },
+    //   { $group: { _id: null, min: { $min: '$<field>' }, max: { $max: '$<field>' } } },
+    //   { $project: { _id: 0, min: 1, max: 1 } }
+    // ])
     const [result] = await col.aggregate(pipeline).toArray();
     res.json(result || { min: null, max: null });
   } catch (err) { next(err); }
@@ -152,6 +170,15 @@ app.get('/api/spec-keys', async (req, res, next) => {
       { $sort: { _id: 1 } },
       { $project: { _id: 0, key: '$_id' } }
     ];
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').aggregate([
+    //   { $match: { category: '<category>', specs: { $type: 'object' } } },
+    //   { $project: { arr: { $objectToArray: '$specs' } } },
+    //   { $unwind: '$arr' },
+    //   { $group: { _id: '$arr.k' } },
+    //   { $sort: { _id: 1 } },
+    //   { $project: { _id: 0, key: '$_id' } }
+    // ])
     const rows = await col.aggregate(pipeline).toArray();
     res.json(rows.map(r => r.key));
   } catch (err) { next(err); }
@@ -175,6 +202,15 @@ app.get('/api/compat-keys', async (req, res, next) => {
       { $sort: { _id: 1 } },
       { $project: { _id: 0, key: '$_id' } }
     ];
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').aggregate([
+    //   { $match: { category: '<category>', compat: { $type: 'object' } } },
+    //   { $project: { arr: { $objectToArray: '$compat' } } },
+    //   { $unwind: '$arr' },
+    //   { $group: { _id: '$arr.k' } },
+    //   { $sort: { _id: 1 } },
+    //   { $project: { _id: 0, key: '$_id' } }
+    // ])
     const rows = await col.aggregate(pipeline).toArray();
     res.json(rows.map(r => r.key));
   } catch (err) { next(err); }
@@ -198,6 +234,15 @@ app.get('/api/field-keys', async (req, res, next) => {
       { $group: { _id: '$arr.k', types: { $addToSet: { $type: '$arr.v' } } } },
       { $project: { _id: 0, key: '$_id', types: 1 } }
     ];
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').aggregate([
+    //   { $match: { category: '<category>' } },
+    //   { $limit: 5000 },
+    //   { $project: { arr: { $objectToArray: '$$ROOT' } } },
+    //   { $unwind: '$arr' },
+    //   { $group: { _id: '$arr.k', types: { $addToSet: { $type: '$arr.v' } } } },
+    //   { $project: { _id: 0, key: '$_id', types: 1 } }
+    // ])
     const rows = await col.aggregate(pipeline).toArray();
 
     const NUMERIC_TYPES = new Set(['double','int','long','decimal','number']);
@@ -254,6 +299,8 @@ app.get('/api/parts', async (req, res, next) => {
     const col = getCollection(COL_PARTS);
     const limit = Math.min(parseInt(req.query.limit || '1000', 10), 5000);
     const query = Object.assign({ category }, extraFilter);
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').find(<query>).limit(<limit>)
     const docs = await col.find(query).limit(limit).toArray();
     res.json(docs);
   } catch (err) { next(err); }
@@ -296,7 +343,15 @@ app.get('/api/pieces', async (req, res, next) => {
       filter[key] = val;
     }
 
+    // CLI Mongo équivalent (compte) :
+    // db.getCollection('<COL_PARTS>').countDocuments(<filter>)
     const totalDocs = await col.countDocuments(filter);
+
+    // CLI Mongo équivalent (pagination) :
+    // db.getCollection('<COL_PARTS>').find(<filter>)
+    //   .sort({ view: 1, _id: 1 })
+    //   .skip(<skip>)
+    //   .limit(<limit>)
     const items = await col
       .find(filter)
       .sort({ view: 1, _id: 1 })
@@ -331,6 +386,8 @@ app.get('/api/pieces/distinct/:field', async (req, res, next) => {
       return res.status(400).json({ error: 'Attribut invalide.' });
     }
 
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_PARTS>').distinct('<field>')
     const raw = await col.distinct(field);
     const values = Array.from(
       new Set(
@@ -374,6 +431,11 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
         };
       });
 
+      // CLI Mongo équivalent (bulk upsert) :
+      // db.getCollection('<COL_BUILDS>').bulkWrite([
+      //   { updateOne: { filter: <filter>, update: { $set: <docAvecCreatedAt> }, upsert: true } },
+      //   ...
+      // ], { ordered: false })
       const r = await col.bulkWrite(ops, { ordered: false });
       return res.status(201).json({
         ok: true,
@@ -390,6 +452,8 @@ app.put('/api/droneFpvAdd', async (req, res, next) => {
       : { _id: `${payload.category || 'item'}_${Date.now()}_${Math.random().toString(36).slice(2)}` };
 
     const update = { $set: { created_at: new Date(), ...payload } };
+    // CLI Mongo équivalent (upsert unitaire) :
+    // db.getCollection('<COL_BUILDS>').updateOne(<filter>, { $set: <payloadAvecCreatedAt> }, { upsert: true })
     const result = await col.updateOne(filter, update, { upsert: true });
 
     return res.status(201).json({
@@ -443,7 +507,15 @@ app.get('/api/builds', async (req, res, next) => {
       ? { _id: 1, name: 1, creator: 1, type: 1, total_price_eur: 1 }
       : undefined;
 
+    // CLI Mongo équivalent (compte) :
+    // db.getCollection('<COL_BUILDS>').countDocuments(<filter>)
     const totalDocs = await col.countDocuments(filter);
+
+    // CLI Mongo équivalent (liste paginée) :
+    // db.getCollection('<COL_BUILDS>').find(<filter>[, <projection>])
+    //   .sort({ created_at: -1, _id: 1 })
+    //   .skip(<skip>)
+    //   .limit(<limit>)
     const items = await col.find(filter, { projection })
       .sort({ created_at: -1, _id: 1 })
       .skip(skip)
@@ -473,6 +545,8 @@ app.get('/api/builds/distinct/:field', async (req, res, next) => {
       return res.status(400).json({ error: 'Champ invalide.' });
     }
 
+    // CLI Mongo équivalent :
+    // db.getCollection('<COL_BUILDS>').distinct('<field>')
     const raw = await col.distinct(field);
     const values = Array.from(
       new Set((raw || [])
@@ -501,7 +575,10 @@ app.get('/api/builds/detail', async (req, res, next) => {
 
     if (_id) {
       const q = {};
-      // si c'est un ObjectId valide -> on tente
+      // CLI Mongo équivalent (si _id est un ObjectId valide) :
+      // db.getCollection('<COL_BUILDS>').findOne({ _id: ObjectId('<_id>') })
+      // CLI Mongo équivalent (sinon, en string brut) :
+      // db.getCollection('<COL_BUILDS>').findOne({ _id: '<_id>' })
       if (/^[0-9a-fA-F]{24}$/.test(String(_id))) {
         const { ObjectId } = require('mongodb');
         try {
@@ -510,7 +587,6 @@ app.get('/api/builds/detail', async (req, res, next) => {
           // on tentera en string ensuite
         }
       }
-      // si pas trouvé ou pas un ObjectId, on tente en string brut
       if (!doc) {
         doc = await col.findOne({ _id: String(_id) });
       }
@@ -530,6 +606,8 @@ app.get('/api/builds/detail', async (req, res, next) => {
       if (!Object.keys(q).length) {
         return res.status(400).json({ error: 'Paramètres insuffisants' });
       }
+      // CLI Mongo équivalent (fallback exact) :
+      // db.getCollection('<COL_BUILDS>').findOne({ name: '<name>', creator: '<creator>', type: '<type>', total_price_eur: <n> })
       doc = await col.findOne(q);
     }
 

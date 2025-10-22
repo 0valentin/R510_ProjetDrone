@@ -76,14 +76,23 @@ app.get('/api/categories', async (req, res, next) => {
   try {
     await connect();
     const col = getCollection(COL_PARTS);
-    // CLI Mongo équivalent :
-    // db.getCollection('<COL_PARTS>').distinct('category')
-    const raw = await col.distinct('category');
-    const values = Array.from(
-      new Set((raw || []).map(v => String(v).trim()).filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+    const pipeline = [
+      { $match: { category: { $exists: true, $ne: '' } } },
+      // $trim pour nettoyer les espaces avant et apres
+      { $project: { _id: 0, category: { $trim: { input: "$category" } } } },
+      // Regrouper pour faire un distinct
+      { $group: { _id: "$category" } },
+      { $sort: { "_id": 1 } }
+    ];
+
+    const result = await col.aggregate(pipeline).toArray();
+    const values = result.map(r => r._id);
+
     res.json(values);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ============ DISTINCT multi-champs (par catégorie) ============

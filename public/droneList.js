@@ -181,11 +181,25 @@ function renderCards(items) {
         el('div', { class: 'price' }, fmtPrice(it.total_price_eur || 0))
       ]),
       el('div', { class: 'foot' }, [
-        el('button', { class: 'btn-open' }, 'Voir le détail')
+        el('button', { class: 'btn-open' }, 'Voir le détail'),
+        el('button', { class: 'btn-delete' }, 'Supprimer')
       ])
     ]);
 
     card.querySelector('.btn-open').addEventListener('click', () => openDetail(it));
+    const delBtn = card.querySelector('.btn-delete');
+    if (delBtn) delBtn.addEventListener('click', async () => {
+      if (!it._id) return alert('Impossible: identifiant manquant');
+      if (!confirm(`Confirmer la suppression du build « ${it.name || it._id} » ?`)) return;
+      try {
+        const url = `/api/builds/${encodeURIComponent(it._id)}`;
+        await fetchJSONNamed('builds.delete', url, { method: 'DELETE' });
+        // rafraîchir la liste
+        loadBuilds();
+      } catch (e) {
+        alert('Erreur lors de la suppression: ' + e.message);
+      }
+    });
     cont.appendChild(card);
   }
 }

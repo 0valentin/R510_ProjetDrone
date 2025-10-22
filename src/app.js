@@ -625,6 +625,30 @@ app.get('/api/builds/detail', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ================== BUILDS: suppression ==================
+// Supprimer un build par _id (ObjectId ou string)
+app.delete('/api/builds/:id', async (req, res, next) => {
+  logCall('buildsDelete', req);
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'Identifiant requis' });
+
+    await connect();
+    const col = getCollection(COL_BUILDS);
+
+    // tenter en ObjectId si possible
+    let filter = { _id: id };
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      const { ObjectId } = require('mongodb');
+      try { filter = { _id: new ObjectId(id) }; } catch (e) { filter = { _id: id }; }
+    }
+
+    const r = await col.deleteOne(filter);
+    if (r.deletedCount === 0) return res.status(404).json({ error: 'Build non trouvé' });
+    res.json({ ok: true, deletedCount: r.deletedCount });
+  } catch (err) { next(err); }
+});
+
 // ------------- Gestion des erreurs -------------
 app.use((err, req, res, _next) => {
   console.error('✖ errorHandler:', err);
